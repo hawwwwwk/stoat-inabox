@@ -21,6 +21,7 @@ SSH into the VM and run:
 ```bash
 cd /opt/stoat && git pull && docker compose pull && docker compose up -d
 ```
+^^ needs work, don't use atm
 
 ## Support
 
