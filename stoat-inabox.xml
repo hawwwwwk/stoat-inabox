@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>stoat-inabox</Name>
+  <Repository>ethxn/stoat-inabox:latest</Repository>
+  <Network>host</Network>
+  <Privileged>false</Privileged>
+  <Overview>Automatically deploys a full Stoat self-hosted chat instance on Unraid.</Overview>
+  <Category>Network:Messenger</Category>
+  <WebUI>http://[IP]:[PORT:8080]/</WebUI>
+  <Icon>https://stoat.chat/favicon.ico</Icon>
+  <TemplateURL>https://raw.githubusercontent.com/hawwwwwk/stoat-inabox/main/stoat-inabox.xml</TemplateURL>
+
+  <Config Name="Docker Socket" Target="/var/run/docker.sock" Default="/var/run/docker.sock"
+    Mode="rw" Type="Path" Display="always" Required="true" Mask="false">
+    /var/run/docker.sock
+  </Config>
+
+  <Config Name="Appdata Location" Target="/appdata" Default="/mnt/user/appdata/stoat"
+    Mode="rw" Type="Path" Display="always" Required="true" Mask="false">
+    /mnt/user/appdata/stoat
+  </Config>
+  
+  <Config Name="WebUI Redirect Port" Target="8080" Default="8080" Mode="tcp"
+  Type="Port" Display="advanced" Required="false" Mask="false">
+    8080
+  </Config>
+
+  <Config Name="Domain" Target="DOMAIN" Default="stoat.yourdomain.com"
+    Type="Variable" Display="always" Required="true" Mask="false">
+    stoat.yourdomain.com
+  </Config>
+
+  <Config Name="Check Interval (minutes)" Target="CHECK_INTERVAL" Default="15"
+    Type="Variable" Display="advanced" Required="false" Mask="false">15
+  </Config>
+</Container>
