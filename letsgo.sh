@@ -2,12 +2,12 @@
 set -e
 
 # ─── Config ───────────────────────────────────────────────────────────────────
-DOMAIN="${DOMAIN:-localhost}"
+DOMAIN="${DOMAIN:-stoat.yourdomain.com}"
 VMNAME="${VMNAME:-Stoat}"
 VM_CPUS="${VM_CPUS:-2}"
-VM_RAM="${VM_RAM:-4096}"       # MB
-VM_DISK="${VM_DISK:-40}"       # GB
-DOMAINS="${DOMAINS:-/mnt/user/domains}"
+VM_RAM="${VM_RAM:-4096}"
+VM_DISK="${VM_DISK:-40}"
+DOMAINS="/mnt/user/domains"
 DOMAINS_HOST="${DOMAINS_HOST:-/mnt/user/domains}"
 APPDATA="/appdata"
 APPDATA_HOST="${APPDATA_HOST:-/mnt/user/appdata/stoat}"
@@ -56,13 +56,26 @@ EOF
 package_update: true
 package_upgrade: true
 
+# Create a user account so you can log into the VM if needed
+users:
+  - name: ubuntu
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+    lock_passwd: false
+    plain_text_passwd: 'stoat'
+
 packages:
   - ca-certificates
   - curl
   - git
   - micro
+  - qemu-guest-agent
 
 runcmd:
+  # Enable and start QEMU guest agent (lets Unraid show the VM's IP)
+  - systemctl enable qemu-guest-agent
+  - systemctl start qemu-guest-agent
+
   # Install Docker
   - install -m 0755 -d /etc/apt/keyrings
   - curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
@@ -77,15 +90,15 @@ runcmd:
   # Generate config
   - cd /opt/stoat && chmod +x ./generate_config.sh && ./generate_config.sh ${DOMAIN}
 
-  # Voice migration
+  # Voice/livekit migration
   - cd /opt/stoat && chmod +x migrations/20260218-voice-config.sh && ./migrations/20260218-voice-config.sh ${DOMAIN}
 
   # Start Stoat
   - cd /opt/stoat && docker compose up -d
 
-  # Enable Stoat to start on VM boot
+  # Install systemd service so Stoat restarts on VM reboot
   - |
-    cat > /etc/systemd/system/stoat.service <<UNIT
+    cat > /etc/systemd/system/stoat.service << 'UNIT'
     [Unit]
     Description=Stoat Chat
     After=docker.service
@@ -104,7 +117,7 @@ runcmd:
   - systemctl enable stoat
   - systemctl daemon-reload
 
-final_message: "Stoat is ready!"
+final_message: "Stoat is ready! Access it at https://${DOMAIN}"
 EOF
 
     # Build cloud-init ISO
@@ -136,7 +149,9 @@ if [ ! -f "$FLAG_VM_CREATED" ]; then
             --import \
             --boot hd,cdrom
 
-        log "VM created and started."
+        log "VM '$VMNAME' created and started."
+        log "First boot will take 5-10 minutes while Stoat installs inside the VM."
+        log "Once done, Stoat will be accessible at https://$DOMAIN"
     fi
 
     touch "$FLAG_VM_CREATED"
@@ -149,7 +164,7 @@ log "Entering monitoring loop (every ${CHECK_INTERVAL} minutes)..."
 while true; do
     sleep $(( CHECK_INTERVAL * 60 ))
     VM_STATE=$(virsh --connect qemu:///system domstate "$VMNAME" 2>/dev/null || echo "unknown")
-    log "VM state: $VM_STATE"
+    log "VM '$VMNAME' state: $VM_STATE"
     if [ "$VM_STATE" != "running" ]; then
         log "VM is not running, starting it..."
         virsh --connect qemu:///system start "$VMNAME" || log "Failed to start VM — it may still be booting."

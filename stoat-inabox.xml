@@ -4,39 +4,42 @@
   <Repository>ethxn/stoat-inabox:latest</Repository>
   <Network>host</Network>
   <Privileged>false</Privileged>
-  <Overview>Automatically downloads Ubuntu, sets up a VM, and deploys a full Stoat self-hosted chat instance on Unraid. Requires virtualization to be enabled. After starting, allow 5-10 minutes for the VM to provision on first boot.</Overview>
+  <Overview>Automatically sets up a full Stoat self-hosted chat instance on Unraid as a VM. Downloads Ubuntu 22.04, provisions a VM, installs Docker, and deploys the entire Stoat stack — all automatically. &#xA;&#xA;Requirements:&#xA;- Virtualization (VT-x / AMD-V) must be enabled&#xA;- Unraid VM Manager must be enabled&#xA;- A domain name pointed at your server (required for HTTPS)&#xA;&#xA;First boot takes 5-10 minutes. The VM will appear in your Unraid VM tab as "Stoat".</Overview>
   <Category>Network:Messenger</Category>
   <WebUI>https://[DOMAIN]/</WebUI>
   <Icon>https://stoat.chat/favicon.ico</Icon>
   <TemplateURL>https://raw.githubusercontent.com/hawwwwwk/stoat-inabox/main/stoat-inabox.xml</TemplateURL>
+  <Support>https://github.com/hawwwwwk/stoat-inabox/issues</Support>
+  <Project>https://stoat.chat</Project>
 
-  <!-- Libvirt socket so container can create and manage VMs -->
+  <!-- Libvirt socket — lets the container create and manage VMs -->
   <Config Name="Libvirt Socket" Target="/var/run/libvirt/libvirt-sock"
     Default="/var/run/libvirt/libvirt-sock" Mode="rw" Type="Path"
     Display="always" Required="true" Mask="false">
     /var/run/libvirt/libvirt-sock
   </Config>
 
-  <!-- Appdata for cloud-init and flags -->
+  <!-- Appdata — stores cloud-init config and state flags -->
   <Config Name="Appdata Location" Target="/appdata"
     Default="/mnt/user/appdata/stoat" Mode="rw" Type="Path"
     Display="always" Required="true" Mask="false">
     /mnt/user/appdata/stoat
   </Config>
 
-  <!-- Domains share for VM disk image -->
+  <!-- Domains — where the VM disk image is stored -->
   <Config Name="VM Images Location" Target="/mnt/user/domains"
     Default="/mnt/user/domains" Mode="rw" Type="Path"
     Display="always" Required="true" Mask="false">
     /mnt/user/domains
   </Config>
 
-  <!-- User-facing settings -->
+  <!-- Your domain name — must be a real domain for HTTPS to work -->
   <Config Name="Domain" Target="DOMAIN" Default="stoat.yourdomain.com"
     Type="Variable" Display="always" Required="true" Mask="false">
     stoat.yourdomain.com
   </Config>
 
+  <!-- VM settings -->
   <Config Name="VM Name" Target="VMNAME" Default="Stoat"
     Type="Variable" Display="always" Required="false" Mask="false">
     Stoat
@@ -57,15 +60,16 @@
     40
   </Config>
 
+  <!-- Host paths — these must match the actual paths on your Unraid server -->
   <Config Name="Appdata Host Path" Target="APPDATA_HOST"
     Default="/mnt/user/appdata/stoat" Type="Variable"
-    Display="always" Required="true" Mask="false">
+    Display="advanced" Required="true" Mask="false">
     /mnt/user/appdata/stoat
   </Config>
 
   <Config Name="Domains Host Path" Target="DOMAINS_HOST"
     Default="/mnt/user/domains" Type="Variable"
-    Display="always" Required="true" Mask="false">
+    Display="advanced" Required="true" Mask="false">
     /mnt/user/domains
   </Config>
 
