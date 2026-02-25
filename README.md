@@ -20,3 +20,15 @@ UNDER CONSTRUCTION
 - [stoat self-hosted docs](https://github.com/stoatchat/self-hosted)
 - [Docker Image](https://hub.docker.com/r/ethxn/stoat-inabox)
 
+## Uninstall Previous Version
+
+- Stop and remove the VM
+```
+virsh --connect qemu:///system destroy Stoat
+virsh --connect qemu:///system undefine Stoat
+```
+- Wipe all data
+```
+rm -rf /mnt/user/appdata/stoat
+rm -rf /mnt/user/domains/stoat
+```

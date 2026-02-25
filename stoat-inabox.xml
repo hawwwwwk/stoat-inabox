@@ -6,11 +6,22 @@
   <Privileged>false</Privileged>
   <Overview>Automatically sets up a full Stoat self-hosted chat instance on Unraid as a VM. Downloads Ubuntu 22.04, provisions a VM, installs Docker, and deploys the entire Stoat stack — all automatically. &#xA;&#xA;Requirements:&#xA;- Virtualization (VT-x / AMD-V) must be enabled&#xA;- Unraid VM Manager must be enabled&#xA;- A domain name pointed at your server (required for HTTPS)&#xA;&#xA;First boot takes 5-10 minutes. The VM will appear in your Unraid VM tab as "Stoat".</Overview>
   <Category>Network:Messenger</Category>
-  <WebUI>https://[DOMAIN]/</WebUI>
+  <WebUI>http://[IP]:[PORT:8080]/</WebUI>
   <Icon>https://stoat.chat/favicon.ico</Icon>
   <TemplateURL>https://raw.githubusercontent.com/hawwwwwk/stoat-inabox/main/stoat-inabox.xml</TemplateURL>
   <Support>https://github.com/hawwwwwk/stoat-inabox/issues</Support>
   <Project>https://stoat.chat</Project>
+
+  <!-- Proxy port — access Stoat via http://[unraid-ip]:[this port] -->
+  <Config Name="Proxy Port" Target="8080" Default="8080" Mode="tcp"
+    Type="Port" Display="always" Required="true" Mask="false">
+    8080
+  </Config>
+
+  <Config Name="Proxy Port Variable" Target="PROXY_PORT" Default="8080"
+    Type="Variable" Display="always" Required="false" Mask="false">
+    8080
+  </Config>
 
   <!-- Libvirt socket — lets the container create and manage VMs -->
   <Config Name="Libvirt Socket" Target="/var/run/libvirt/libvirt-sock"

@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y \
     cloud-image-utils \
     virtinst \
     libvirt-clients \
+    socat \
     && rm -rf /var/lib/apt/lists/*
 
 COPY letsgo.sh /letsgo.sh
