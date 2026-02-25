@@ -14,6 +14,30 @@ One-click [Stoat](https://stoat.chat) self-hosted chat for Unraid. Installs ever
 
 UNDER CONSTRUCTION
 
+##### Example Deployment (please use Unraid's appstore instead)
+
+```
+docker run -d \
+  --name stoat-inabox \
+  --network host \
+  --restart unless-stopped \
+  -v /var/run/libvirt/libvirt-sock:/var/run/libvirt/libvirt-sock \
+  -v /mnt/user/appdata/stoat:/appdata \
+  -v /mnt/user/domains:/mnt/user/domains \
+  -e DOMAIN=stoat.yourdomain.com \
+  -e VMNAME=Stoat \
+  -e VM_CPUS=2 \
+  -e VM_RAM=6144 \
+  -e VM_DISK=40 \
+  -e PROXY_PORT=8080 \
+  -e APPDATA_HOST=/mnt/user/appdata/stoat \
+  -e DOMAINS_HOST=/mnt/user/domains \
+  -e CHECK_INTERVAL=15 \
+  ethxn/stoat-inabox:latest
+```
+
+When running the cloud-init (it may take up to 15 minutes to fully deploy everything), if you want to check the progress of the container, you can via `virsh --connect qemu:///system console Stoat` (replace "Stoat" with your VM name)
+
 ## Support
 
 - [stoat-inabox issues](https://github.com/hawwwwwk/stoat-inabox/issues)
