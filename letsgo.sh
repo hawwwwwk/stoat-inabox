@@ -5,7 +5,7 @@ set -e
 DOMAIN="${DOMAIN:-stoat.yourdomain.com}"
 VMNAME="${VMNAME:-Stoat}"
 VM_CPUS="${VM_CPUS:-2}"
-VM_RAM="${VM_RAM:-6144}"
+VM_RAM="${VM_RAM:-4096}"
 VM_DISK="${VM_DISK:-40}"
 DOMAINS="/mnt/user/domains"
 DOMAINS_HOST="${DOMAINS_HOST:-/mnt/user/domains}"
@@ -56,9 +56,6 @@ EOF
 package_update: true
 package_upgrade: true
 
-# Allow SSH password authentication
-ssh_pwauth: true
-
 # Create a user account so you can log into the VM if needed
 users:
   - name: ubuntu
@@ -95,6 +92,20 @@ runcmd:
 
   # Voice/livekit migration
   - cd /opt/stoat && chmod +x migrations/20260218-voice-config.sh && ./migrations/20260218-voice-config.sh ${DOMAIN}
+
+  # Pin MongoDB to 4.4 for CPUs without AVX support
+  - |
+    cat > /opt/stoat/compose.override.yml << 'OVERRIDE'
+    services:
+      database:
+        image: mongo:4.4
+        healthcheck:
+          test: echo 'db.runCommand("ping").ok' | mongo localhost:27017/test --quiet
+          interval: 10s
+          timeout: 10s
+          retries: 5
+          start_period: 40s
+    OVERRIDE
 
   # Start Stoat
   - cd /opt/stoat && docker compose up -d
