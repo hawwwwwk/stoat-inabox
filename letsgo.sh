@@ -1,56 +1,157 @@
 #!/bin/bash
 set -e
 
+# ─── Config ───────────────────────────────────────────────────────────────────
 DOMAIN="${DOMAIN:-localhost}"
-APPDATA="${APPDATA:-/mnt/user/appdata/stoat}"
+VMNAME="${VMNAME:-Stoat}"
+VM_CPUS="${VM_CPUS:-2}"
+VM_RAM="${VM_RAM:-4096}"       # MB
+VM_DISK="${VM_DISK:-40}"       # GB
+DOMAINS="${DOMAINS:-/mnt/user/domains}"
+DOMAINS_HOST="${DOMAINS_HOST:-/mnt/user/domains}"
+APPDATA="/appdata"
+APPDATA_HOST="${APPDATA_HOST:-/mnt/user/appdata/stoat}"
+CHECK_INTERVAL="${CHECK_INTERVAL:-15}"
 
-echo "[stoat-inabox] Starting up..."
-echo "[stoat-inabox] Domain: $DOMAIN"
-echo "[stoat-inabox] Appdata: $APPDATA"
+UBUNTU_IMAGE_URL="https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img"
+DISK_PATH="$DOMAINS/stoat/stoat.qcow2"
+DISK_PATH_HOST="$DOMAINS_HOST/stoat/stoat.qcow2"
+CLOUDINIT_DIR="$APPDATA/cloudinit"
+CLOUDINIT_ISO="$APPDATA/cloudinit.iso"
+CLOUDINIT_ISO_HOST="$APPDATA_HOST/cloudinit.iso"
+FLAG_VM_CREATED="$APPDATA/.vm-created"
 
-mkdir -p "$APPDATA"
+# ─── Helpers ──────────────────────────────────────────────────────────────────
+log() { echo "[stoat-inabox] $*"; }
 
-# Clone or update the stoat self-hosted repo
-if [ ! -d "$APPDATA/self-hosted" ]; then
-    echo "[stoat-inabox] Cloning stoat self-hosted repo..."
-    git clone https://github.com/stoatchat/self-hosted "$APPDATA/self-hosted"
+# ─── Setup dirs ───────────────────────────────────────────────────────────────
+log "Starting up..."
+log "Domain: $DOMAIN | VM: $VMNAME | CPUs: $VM_CPUS | RAM: ${VM_RAM}MB | Disk: ${VM_DISK}GB"
+mkdir -p "$DOMAINS/stoat" "$APPDATA" "$CLOUDINIT_DIR"
+
+# ─── Download base image ──────────────────────────────────────────────────────
+if [ ! -f "$DISK_PATH" ]; then
+    log "Downloading Ubuntu 22.04 cloud image..."
+    curl -L --progress-bar "$UBUNTU_IMAGE_URL" -o "$DISK_PATH.tmp"
+    mv "$DISK_PATH.tmp" "$DISK_PATH"
+    log "Resizing disk to ${VM_DISK}GB..."
+    qemu-img resize "$DISK_PATH" "${VM_DISK}G"
 else
-    echo "[stoat-inabox] Repo already exists, pulling latest..."
-    cd "$APPDATA/self-hosted" && git pull
+    log "Disk image already exists, skipping download."
 fi
 
-cd "$APPDATA/self-hosted"
+# ─── Generate cloud-init ──────────────────────────────────────────────────────
+if [ ! -f "$FLAG_VM_CREATED" ]; then
+    log "Generating cloud-init config..."
 
-# Run config generator only if config doesn't already exist
-if [ ! -f "$APPDATA/self-hosted/Revolt.toml" ]; then
-    echo "[stoat-inabox] Generating config for $DOMAIN..."
-    chmod +x ./generate_config.sh
-    ./generate_config.sh "$DOMAIN"
-else
-    echo "[stoat-inabox] Config already exists, skipping generation."
+    # meta-data
+    cat > "$CLOUDINIT_DIR/meta-data" <<EOF
+instance-id: stoat-inabox
+local-hostname: stoat
+EOF
+
+    # user-data — runs inside the VM on first boot
+    cat > "$CLOUDINIT_DIR/user-data" <<EOF
+#cloud-config
+package_update: true
+package_upgrade: true
+
+packages:
+  - ca-certificates
+  - curl
+  - git
+  - micro
+
+runcmd:
+  # Install Docker
+  - install -m 0755 -d /etc/apt/keyrings
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+  - chmod a+r /etc/apt/keyrings/docker.asc
+  - echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu jammy stable" > /etc/apt/sources.list.d/docker.list
+  - apt-get update
+  - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+  # Clone Stoat self-hosted
+  - git clone https://github.com/stoatchat/self-hosted /opt/stoat
+
+  # Generate config
+  - cd /opt/stoat && chmod +x ./generate_config.sh && ./generate_config.sh ${DOMAIN}
+
+  # Voice migration
+  - cd /opt/stoat && chmod +x migrations/20260218-voice-config.sh && ./migrations/20260218-voice-config.sh ${DOMAIN}
+
+  # Start Stoat
+  - cd /opt/stoat && docker compose up -d
+
+  # Enable Stoat to start on VM boot
+  - |
+    cat > /etc/systemd/system/stoat.service <<UNIT
+    [Unit]
+    Description=Stoat Chat
+    After=docker.service
+    Requires=docker.service
+
+    [Service]
+    WorkingDirectory=/opt/stoat
+    ExecStart=/usr/bin/docker compose up -d
+    ExecStop=/usr/bin/docker compose down
+    Restart=always
+    RestartSec=10
+
+    [Install]
+    WantedBy=multi-user.target
+    UNIT
+  - systemctl enable stoat
+  - systemctl daemon-reload
+
+final_message: "Stoat is ready!"
+EOF
+
+    # Build cloud-init ISO
+    log "Building cloud-init ISO..."
+    cloud-localds "$CLOUDINIT_ISO" "$CLOUDINIT_DIR/user-data" "$CLOUDINIT_DIR/meta-data"
+    log "Cloud-init ISO built at host path: $CLOUDINIT_ISO_HOST"
 fi
 
-# Run the voice migration only once
-if [ ! -f "$APPDATA/.voice-migration-done" ]; then
-    echo "[stoat-inabox] Running voice/livekit migration..."
-    chmod +x migrations/20260218-voice-config.sh
-    ./migrations/20260218-voice-config.sh "$DOMAIN"
-    touch "$APPDATA/.voice-migration-done"
+# ─── Create and register VM ───────────────────────────────────────────────────
+if [ ! -f "$FLAG_VM_CREATED" ]; then
+    log "Checking for existing VM named '$VMNAME'..."
+    if virsh --connect qemu:///system dominfo "$VMNAME" &>/dev/null; then
+        log "VM already exists, skipping creation."
+    else
+        log "Creating VM '$VMNAME'..."
+
+        virt-install \
+            --connect qemu:///system \
+            --name "$VMNAME" \
+            --memory "$VM_RAM" \
+            --vcpus "$VM_CPUS" \
+            --disk path="$DISK_PATH_HOST",format=qcow2,bus=virtio \
+            --disk path="$CLOUDINIT_ISO_HOST",device=cdrom \
+            --os-variant ubuntu22.04 \
+            --network bridge=br0,model=virtio \
+            --graphics none \
+            --console pty,target_type=serial \
+            --noautoconsole \
+            --import \
+            --boot hd,cdrom
+
+        log "VM created and started."
+    fi
+
+    touch "$FLAG_VM_CREATED"
 else
-    echo "[stoat-inabox] Voice migration already applied, skipping."
+    log "VM already set up, skipping creation."
 fi
 
-# Bring up the full Stoat stack
-echo "[stoat-inabox] Starting Stoat stack..."
-docker compose -f "$APPDATA/self-hosted/compose.yml" up -d
-
-echo "[stoat-inabox] Stoat is up! Accessible at https://$DOMAIN"
-echo "[stoat-inabox] Entering monitoring loop (interval: ${CHECK_INTERVAL:-15} minutes)..."
-
-# Monitoring loop, keeps the stack healthy
+# ─── Monitoring loop ──────────────────────────────────────────────────────────
+log "Entering monitoring loop (every ${CHECK_INTERVAL} minutes)..."
 while true; do
-    sleep $(( ${CHECK_INTERVAL:-15} * 60 ))
-    echo "[stoat-inabox] Checking stack health..."
-    docker compose -f "$APPDATA/self-hosted/compose.yml" up -d
-    echo "[stoat-inabox] Health check done."
+    sleep $(( CHECK_INTERVAL * 60 ))
+    VM_STATE=$(virsh --connect qemu:///system domstate "$VMNAME" 2>/dev/null || echo "unknown")
+    log "VM state: $VM_STATE"
+    if [ "$VM_STATE" != "running" ]; then
+        log "VM is not running, starting it..."
+        virsh --connect qemu:///system start "$VMNAME" || log "Failed to start VM — it may still be booting."
+    fi
 done

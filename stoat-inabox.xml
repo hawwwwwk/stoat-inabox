@@ -4,33 +4,73 @@
   <Repository>ethxn/stoat-inabox:latest</Repository>
   <Network>host</Network>
   <Privileged>false</Privileged>
-  <Overview>Automatically deploys a full Stoat self-hosted chat instance on Unraid.</Overview>
+  <Overview>Automatically downloads Ubuntu, sets up a VM, and deploys a full Stoat self-hosted chat instance on Unraid. Requires virtualization to be enabled. After starting, allow 5-10 minutes for the VM to provision on first boot.</Overview>
   <Category>Network:Messenger</Category>
-  <WebUI>http://[IP]:[PORT:8080]/</WebUI>
+  <WebUI>https://[DOMAIN]/</WebUI>
   <Icon>https://stoat.chat/favicon.ico</Icon>
   <TemplateURL>https://raw.githubusercontent.com/hawwwwwk/stoat-inabox/main/stoat-inabox.xml</TemplateURL>
 
-  <Config Name="Docker Socket" Target="/var/run/docker.sock" Default="/var/run/docker.sock"
-    Mode="rw" Type="Path" Display="always" Required="true" Mask="false">
-    /var/run/docker.sock
+  <!-- Libvirt socket so container can create and manage VMs -->
+  <Config Name="Libvirt Socket" Target="/var/run/libvirt/libvirt-sock"
+    Default="/var/run/libvirt/libvirt-sock" Mode="rw" Type="Path"
+    Display="always" Required="true" Mask="false">
+    /var/run/libvirt/libvirt-sock
   </Config>
 
-  <Config Name="Appdata Location" Target="/appdata" Default="/mnt/user/appdata/stoat"
-    Mode="rw" Type="Path" Display="always" Required="true" Mask="false">
+  <!-- Appdata for cloud-init and flags -->
+  <Config Name="Appdata Location" Target="/appdata"
+    Default="/mnt/user/appdata/stoat" Mode="rw" Type="Path"
+    Display="always" Required="true" Mask="false">
     /mnt/user/appdata/stoat
   </Config>
-  
-  <Config Name="WebUI Redirect Port" Target="8080" Default="8080" Mode="tcp"
-  Type="Port" Display="advanced" Required="false" Mask="false">
-    8080
+
+  <!-- Domains share for VM disk image -->
+  <Config Name="VM Images Location" Target="/mnt/user/domains"
+    Default="/mnt/user/domains" Mode="rw" Type="Path"
+    Display="always" Required="true" Mask="false">
+    /mnt/user/domains
   </Config>
 
+  <!-- User-facing settings -->
   <Config Name="Domain" Target="DOMAIN" Default="stoat.yourdomain.com"
     Type="Variable" Display="always" Required="true" Mask="false">
     stoat.yourdomain.com
   </Config>
 
+  <Config Name="VM Name" Target="VMNAME" Default="Stoat"
+    Type="Variable" Display="always" Required="false" Mask="false">
+    Stoat
+  </Config>
+
+  <Config Name="VM CPU Cores" Target="VM_CPUS" Default="2"
+    Type="Variable" Display="always" Required="false" Mask="false">
+    2
+  </Config>
+
+  <Config Name="VM RAM (MB)" Target="VM_RAM" Default="4096"
+    Type="Variable" Display="always" Required="false" Mask="false">
+    4096
+  </Config>
+
+  <Config Name="VM Disk Size (GB)" Target="VM_DISK" Default="40"
+    Type="Variable" Display="always" Required="false" Mask="false">
+    40
+  </Config>
+
+  <Config Name="Appdata Host Path" Target="APPDATA_HOST"
+    Default="/mnt/user/appdata/stoat" Type="Variable"
+    Display="always" Required="true" Mask="false">
+    /mnt/user/appdata/stoat
+  </Config>
+
+  <Config Name="Domains Host Path" Target="DOMAINS_HOST"
+    Default="/mnt/user/domains" Type="Variable"
+    Display="always" Required="true" Mask="false">
+    /mnt/user/domains
+  </Config>
+
   <Config Name="Check Interval (minutes)" Target="CHECK_INTERVAL" Default="15"
-    Type="Variable" Display="advanced" Required="false" Mask="false">15
+    Type="Variable" Display="advanced" Required="false" Mask="false">
+    15
   </Config>
 </Container>
