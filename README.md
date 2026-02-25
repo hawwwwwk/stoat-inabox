@@ -24,7 +24,7 @@ docker run -d \
   -v /var/run/libvirt/libvirt-sock:/var/run/libvirt/libvirt-sock \
   -v /mnt/user/appdata/stoat:/appdata \
   -v /mnt/user/domains:/mnt/user/domains \
-  -e DOMAIN=stoat.yourdomain.com \
+  -e DOMAIN=stoat.ethxn.xyz \
   -e VMNAME=Stoat \
   -e VM_CPUS=2 \
   -e VM_RAM=6144 \

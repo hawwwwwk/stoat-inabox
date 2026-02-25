@@ -64,6 +64,20 @@ users:
     lock_passwd: false
     plain_text_passwd: 'stoat'
 
+write_files:
+  - path: /opt/stoat/compose.override.yml
+    permissions: '0644'
+    content: |
+      services:
+        database:
+          image: mongo:4.4
+          healthcheck:
+            test: echo 'db.runCommand("ping").ok' | mongo localhost:27017/test --quiet
+            interval: 10s
+            timeout: 10s
+            retries: 5
+            start_period: 40s
+
 packages:
   - ca-certificates
   - curl
@@ -159,64 +173,14 @@ else
     log "VM already set up, skipping creation."
 fi
 
-# ─── Get VM IP ───────────────────────────────────────────────────────────────
-get_vm_ip() {
-    virsh --connect qemu:///system domifaddr "$VMNAME" 2>/dev/null         | grep -oP '\d+\.\d+\.\d+\.\d+'         | head -1
-}
-
-# ─── Proxy management ────────────────────────────────────────────────────────
-PROXY_PORT="${PROXY_PORT:-8080}"
-SOCAT_PID=""
-
-start_proxy() {
-    local vm_ip="$1"
-    # Kill existing socat if running
-    if [ -n "$SOCAT_PID" ] && kill -0 "$SOCAT_PID" 2>/dev/null; then
-        kill "$SOCAT_PID"
-    fi
-    log "Starting proxy: 0.0.0.0:$PROXY_PORT -> $vm_ip:80"
-    socat TCP-LISTEN:${PROXY_PORT},fork,reuseaddr TCP:${vm_ip}:80 &
-    SOCAT_PID=$!
-}
-
-# ─── Wait for VM IP ───────────────────────────────────────────────────────────
-log "Waiting for VM to get an IP address..."
-VM_IP=""
-while [ -z "$VM_IP" ]; do
-    VM_IP=$(get_vm_ip)
-    if [ -z "$VM_IP" ]; then
-        sleep 10
-    fi
-done
-log "VM IP detected: $VM_IP"
-start_proxy "$VM_IP"
-log "Stoat is now accessible at http://[your-unraid-ip]:$PROXY_PORT"
-
 # ─── Monitoring loop ──────────────────────────────────────────────────────────
 log "Entering monitoring loop (every ${CHECK_INTERVAL} minutes)..."
 while true; do
     sleep $(( CHECK_INTERVAL * 60 ))
-
-    # Check VM state
     VM_STATE=$(virsh --connect qemu:///system domstate "$VMNAME" 2>/dev/null || echo "unknown")
     log "VM '$VMNAME' state: $VM_STATE"
     if [ "$VM_STATE" != "running" ]; then
         log "VM is not running, starting it..."
         virsh --connect qemu:///system start "$VMNAME" || log "Failed to start VM — it may still be booting."
-        SOCAT_PID=""
-    fi
-
-    # Check if VM IP has changed and update proxy
-    NEW_IP=$(get_vm_ip)
-    if [ -n "$NEW_IP" ] && [ "$NEW_IP" != "$VM_IP" ]; then
-        log "VM IP changed from $VM_IP to $NEW_IP, updating proxy..."
-        VM_IP="$NEW_IP"
-        start_proxy "$VM_IP"
-    fi
-
-    # Restart proxy if it died
-    if [ -n "$SOCAT_PID" ] && ! kill -0 "$SOCAT_PID" 2>/dev/null; then
-        log "Proxy died, restarting..."
-        start_proxy "$VM_IP"
     fi
 done
