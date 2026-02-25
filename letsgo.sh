@@ -5,7 +5,7 @@ set -e
 DOMAIN="${DOMAIN:-stoat.yourdomain.com}"
 VMNAME="${VMNAME:-Stoat}"
 VM_CPUS="${VM_CPUS:-2}"
-VM_RAM="${VM_RAM:-4096}"
+VM_RAM="${VM_RAM:-6144}"
 VM_DISK="${VM_DISK:-40}"
 DOMAINS="/mnt/user/domains"
 DOMAINS_HOST="${DOMAINS_HOST:-/mnt/user/domains}"
@@ -55,6 +55,9 @@ EOF
 #cloud-config
 package_update: true
 package_upgrade: true
+
+# Allow SSH password authentication
+ssh_pwauth: true
 
 # Create a user account so you can log into the VM if needed
 users:

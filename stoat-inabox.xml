@@ -50,9 +50,9 @@
     2
   </Config>
 
-  <Config Name="VM RAM (MB)" Target="VM_RAM" Default="4096"
+  <Config Name="VM RAM (MB)" Target="VM_RAM" Default="6144"
     Type="Variable" Display="always" Required="false" Mask="false">
-    4096
+    6144
   </Config>
 
   <Config Name="VM Disk Size (GB)" Target="VM_DISK" Default="40"
