@@ -8,22 +8,15 @@ One-click [Stoat](https://stoat.chat) self-hosted chat for Unraid. Installs ever
 
 - Virtualization enabled (VT-x or AMD-V)
 - Unraid VM Manager enabled (Settings → VM Manager)
-- under construction
+- UNDER CONSTRUCTION
 
 ## Installation
 
-under construction
-
-## Updating Stoat
-
-SSH into the VM and run:
-
-```bash
-cd /opt/stoat && git pull && docker compose pull && docker compose up -d
-```
-^^ needs work, don't use atm
+UNDER CONSTRUCTION
 
 ## Support
 
 - [stoat-inabox issues](https://github.com/hawwwwwk/stoat-inabox/issues)
-- [Stoat self-hosted docs](https://github.com/stoatchat/self-hosted)
+- [stoat self-hosted docs](https://github.com/stoatchat/self-hosted)
+- [Docker Image](https://hub.docker.com/r/ethxn/stoat-inabox)
+
