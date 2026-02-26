@@ -36,7 +36,7 @@ docker run -d \
   ethxn/stoat-inabox:latest
 ```
 
-When running the cloud-init (it may take up to 15 minutes to fully deploy everything), if you want to check the progress of the container, you can via `virsh --connect qemu:///system console Stoat` (replace "Stoat" with your VM name)
+When running the cloud-init (it may take up to 15 minutes to fully deploy everything), if you want to check the progress of the container, you can via `virsh --connect qemu:///system console Stoat` in the Unraid terminal (replace "Stoat" with your VM name).
 
 ## Support
 
