@@ -106,8 +106,10 @@ runcmd:
   # Add ubuntu to docker group so it can use docker without sudo
   - usermod -aG docker ubuntu
 
-  # Clone Stoat self-hosted
+  # Clone Stoat self-hosted (move override out of the way first since write_files created the dir)
+  - mv /opt/stoat/compose.override.yml /tmp/compose.override.yml
   - git clone https://github.com/stoatchat/self-hosted /opt/stoat
+  - mv /tmp/compose.override.yml /opt/stoat/compose.override.yml
 
   # Generate config (this also sets up livekit config)
   - cd /opt/stoat && chmod +x ./generate_config.sh && ./generate_config.sh ${DOMAIN}
