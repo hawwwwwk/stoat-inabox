@@ -182,7 +182,9 @@ fi
 
 # ─── Get VM IP ────────────────────────────────────────────────────────────────
 get_vm_ip() {
-    virsh --connect qemu:///system domifaddr "$VMNAME" 2>/dev/null \
+    # Use guest agent to get the VM's IP — filter for the main interface IPv4
+    virsh --connect qemu:///system domifaddr "$VMNAME" --source agent 2>/dev/null \
+        | grep 'enp\|eth' \
         | grep -oP '\d+\.\d+\.\d+\.\d+' \
         | head -1
 }
