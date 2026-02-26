@@ -5,13 +5,14 @@ set -e
 DOMAIN="${DOMAIN:-stoat.yourdomain.com}"
 VMNAME="${VMNAME:-Stoat}"
 VM_CPUS="${VM_CPUS:-2}"
-VM_RAM="${VM_RAM:-4096}"
+VM_RAM="${VM_RAM:-6144}"
 VM_DISK="${VM_DISK:-40}"
 DOMAINS="/mnt/user/domains"
 DOMAINS_HOST="${DOMAINS_HOST:-/mnt/user/domains}"
 APPDATA="/appdata"
 APPDATA_HOST="${APPDATA_HOST:-/mnt/user/appdata/stoat}"
 CHECK_INTERVAL="${CHECK_INTERVAL:-15}"
+PROXY_PORT="${PROXY_PORT:-8080}"
 
 UBUNTU_IMAGE_URL="https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img"
 DISK_PATH="$DOMAINS/stoat/stoat.qcow2"
@@ -56,7 +57,9 @@ EOF
 package_update: true
 package_upgrade: true
 
-# Create a user account so you can log into the VM if needed
+# Allow SSH password authentication
+ssh_pwauth: true
+
 users:
   - name: ubuntu
     sudo: ALL=(ALL) NOPASSWD:ALL
@@ -88,7 +91,7 @@ packages:
   - qemu-guest-agent
 
 runcmd:
-  # Enable and start QEMU guest agent (lets Unraid show the VM's IP)
+  # Enable QEMU guest agent so Unraid shows the VM's IP
   - systemctl enable qemu-guest-agent
   - systemctl start qemu-guest-agent
 
@@ -100,12 +103,14 @@ runcmd:
   - apt-get update
   - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
+  # Add ubuntu to docker group so it can use docker without sudo
+  - usermod -aG docker ubuntu
+
   # Clone Stoat self-hosted
   - git clone https://github.com/stoatchat/self-hosted /opt/stoat
 
-  # Generate config
+  # Generate config (this also sets up livekit config)
   - cd /opt/stoat && chmod +x ./generate_config.sh && ./generate_config.sh ${DOMAIN}
-
 
   # Start Stoat
   - cd /opt/stoat && docker compose up -d
@@ -164,8 +169,8 @@ if [ ! -f "$FLAG_VM_CREATED" ]; then
             --boot hd,cdrom
 
         log "VM '$VMNAME' created and started."
-        log "First boot will take 5-10 minutes while Stoat installs inside the VM."
-        log "Once done, Stoat will be accessible at https://$DOMAIN"
+        log "First boot takes 5-10 minutes while Stoat installs inside the VM."
+        log "Once done, Stoat will be accessible at http://[unraid-ip]:$PROXY_PORT"
     fi
 
     touch "$FLAG_VM_CREATED"
@@ -173,14 +178,63 @@ else
     log "VM already set up, skipping creation."
 fi
 
+# ─── Get VM IP ────────────────────────────────────────────────────────────────
+get_vm_ip() {
+    virsh --connect qemu:///system domifaddr "$VMNAME" 2>/dev/null \
+        | grep -oP '\d+\.\d+\.\d+\.\d+' \
+        | head -1
+}
+
+# ─── Proxy management ─────────────────────────────────────────────────────────
+SOCAT_PID=""
+
+start_proxy() {
+    local vm_ip="$1"
+    if [ -n "$SOCAT_PID" ] && kill -0 "$SOCAT_PID" 2>/dev/null; then
+        kill "$SOCAT_PID"
+    fi
+    log "Starting proxy: 0.0.0.0:$PROXY_PORT -> $vm_ip:80"
+    socat TCP-LISTEN:${PROXY_PORT},fork,reuseaddr TCP:${vm_ip}:80 &
+    SOCAT_PID=$!
+}
+
+# ─── Wait for VM IP ───────────────────────────────────────────────────────────
+log "Waiting for VM to get an IP address..."
+VM_IP=""
+while [ -z "$VM_IP" ]; do
+    VM_IP=$(get_vm_ip)
+    if [ -z "$VM_IP" ]; then
+        sleep 10
+    fi
+done
+log "VM IP detected: $VM_IP"
+start_proxy "$VM_IP"
+log "Stoat will be accessible at http://[unraid-ip]:$PROXY_PORT once installation completes (~5-10 min)"
+
 # ─── Monitoring loop ──────────────────────────────────────────────────────────
 log "Entering monitoring loop (every ${CHECK_INTERVAL} minutes)..."
 while true; do
     sleep $(( CHECK_INTERVAL * 60 ))
+
     VM_STATE=$(virsh --connect qemu:///system domstate "$VMNAME" 2>/dev/null || echo "unknown")
     log "VM '$VMNAME' state: $VM_STATE"
     if [ "$VM_STATE" != "running" ]; then
         log "VM is not running, starting it..."
         virsh --connect qemu:///system start "$VMNAME" || log "Failed to start VM — it may still be booting."
+        SOCAT_PID=""
+    fi
+
+    # Update proxy if VM IP changed
+    NEW_IP=$(get_vm_ip)
+    if [ -n "$NEW_IP" ] && [ "$NEW_IP" != "$VM_IP" ]; then
+        log "VM IP changed from $VM_IP to $NEW_IP, updating proxy..."
+        VM_IP="$NEW_IP"
+        start_proxy "$VM_IP"
+    fi
+
+    # Restart proxy if it died
+    if [ -n "$SOCAT_PID" ] && ! kill -0 "$SOCAT_PID" 2>/dev/null; then
+        log "Proxy died, restarting..."
+        start_proxy "$VM_IP"
     fi
 done

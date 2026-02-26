@@ -29,7 +29,7 @@ docker run -d \
   -e VM_CPUS=2 \
   -e VM_RAM=6144 \
   -e VM_DISK=40 \
-  -e PROXY_PORT=8080 \
+  -e PROXY_PORT=8456 \
   -e APPDATA_HOST=/mnt/user/appdata/stoat \
   -e DOMAINS_HOST=/mnt/user/domains \
   -e CHECK_INTERVAL=15 \
