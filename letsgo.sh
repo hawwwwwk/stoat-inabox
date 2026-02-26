@@ -77,6 +77,8 @@ write_files:
             timeout: 10s
             retries: 5
             start_period: 40s
+        redis:
+          image: eqalpha/keydb:x86_64_v6.3.0
 
 packages:
   - ca-certificates
@@ -104,8 +106,6 @@ runcmd:
   # Generate config
   - cd /opt/stoat && chmod +x ./generate_config.sh && ./generate_config.sh ${DOMAIN}
 
-  # Voice/livekit migration
-  - cd /opt/stoat && chmod +x migrations/20260218-voice-config.sh && ./migrations/20260218-voice-config.sh ${DOMAIN}
 
   # Start Stoat
   - cd /opt/stoat && docker compose up -d
